@@ -1,38 +1,38 @@
-const express = require("express");
-const { errorHandler } = require("./middlewares/errorMiddleware");
-require("colors");
-const products = require("./data/products");
-const dotenv = require("dotenv");
-const connectDb = require("./config/config");
-const productRoutes = require("./routes/productsRoute");
-const usersRoutes = require("./routes/UsersRoute");
-const orderRoutes = require("./routes/orderRoute");
+const app = require("./app");
+const cloudinary = require("cloudinary");
+const connectDatabase = require("./config/database");
 
-dotenv.config();
-//connecting to mongodb database
-connectDb();
-const app = express();
-//middleware bodyparser
-app.use(express.json());
-
-//dotenv config
-app.get("/", (req, res) => {
-  res.send("<h1>Welcome to Node Server</h1>");
+// Handling Uncaught Exception
+process.on("uncaughtException", (err) => {
+  console.log(`Error: ${err.message}`);
+  console.log(`Shutting down the server due to Uncaught Exception`);
+  process.exit(1);
 });
 
-app.use("/api", productRoutes);
-app.use("/api/users", usersRoutes);
-app.use("/api/orders", orderRoutes);
-app.get("/api/config/paypal", (req, res) => {
-  res.send(process.env.PAYPAL_CLIENT_ID);
+// Config
+if (process.env.NODE_ENV !== "PRODUCTION") {
+  require("dotenv").config({ path: "backend/config/config.env" });
+}
+
+// Connecting to database
+connectDatabase();
+
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-app.use(errorHandler);
+const server = app.listen(process.env.PORT, () => {
+  console.log(`Server is working on http://localhost:${process.env.PORT}`);
+});
 
-const PORT = 8080;
-app.listen(process.env.PORT || PORT, () => {
-  console.log(
-    `Server Running in ${process.env.NODE_ENV} Mode on Port ${process.env.PORT}`
-      .inverse
-  );
+// Unhandled Promise Rejection
+process.on("unhandledRejection", (err) => {
+  console.log(`Error: ${err.message}`);
+  console.log(`Shutting down the server due to Unhandled Promise Rejection`);
+
+  server.close(() => {
+    process.exit(1);
+  });
 });

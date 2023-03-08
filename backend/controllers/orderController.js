@@ -1,74 +1,130 @@
-const asyncHandler = require("express-async-handler");
-const Order = require("../models/OrderModel");
+const Order = require("../models/orderModel");
+const Product = require("../models/productModel");
+const ErrorHander = require("../utils/errorhander");
+const catchAsyncErrors = require("../middleware/catchAsyncErrors");
 
-const addOrderItem = asyncHandler(async (req, res) => {
+// Create new Order
+exports.newOrder = catchAsyncErrors(async (req, res, next) => {
   const {
+    shippingInfo,
     orderItems,
-    shippingAddress,
-    paymentMethod,
+    paymentInfo,
     itemsPrice,
     taxPrice,
     shippingPrice,
     totalPrice,
   } = req.body;
-  if (orderItems && orderItems.length === 0) {
-    res.status(400);
-    throw new Error("No Order Found");
-    return;
-  } else {
-    const order = new Order({
-      orderItems,
-      user: req.user._id,
-      shippingAddress,
-      paymentMethod,
-      itemsPrice,
-      taxPrice,
-      shippingPrice,
-      totalPrice,
-    });
 
-    const createOrder = await order.save();
-    res.status(201).json(createOrder);
-  }
+  const order = await Order.create({
+    shippingInfo,
+    orderItems,
+    paymentInfo,
+    itemsPrice,
+    taxPrice,
+    shippingPrice,
+    totalPrice,
+    paidAt: Date.now(),
+    user: req.user._id,
+  });
+
+  res.status(201).json({
+    success: true,
+    order,
+  });
 });
 
-//getOrderByID
-const getOrderById = asyncHandler(async (req, res) => {
+// get Single Order
+exports.getSingleOrder = catchAsyncErrors(async (req, res, next) => {
   const order = await Order.findById(req.params.id).populate(
     "user",
     "name email"
   );
-  if (order) {
-    res.json(order);
-  } else {
-    res.status(404);
-    throw new Error("Order Not Found");
+
+  if (!order) {
+    return next(new ErrorHander("Order not found with this Id", 404));
   }
+
+  res.status(200).json({
+    success: true,
+    order,
+  });
 });
 
-//paidendpoint
-const updateOrderToPaid = asyncHandler(async (req, res) => {
-  const order = await Order.findById(req.params.id);
-  if (order) {
-    (order.isPaid = true),
-      (order.paidAt = Date.now()),
-      (order.paymentResult = {
-        id: req.body.id,
-        status: req.body.status,
-        update_time: req.body.update_time,
-        email_address: req.body.payer.email_address,
-      });
-    const updateOrder = await order.save();
-    res.json(updateOrder);
-  } else {
-    res.status(404);
-    throw new Error("Order Not Found");
-  }
-});
-
-const getMyOrders = asyncHandler(async (req, res) => {
+// get logged in user  Orders
+exports.myOrders = catchAsyncErrors(async (req, res, next) => {
   const orders = await Order.find({ user: req.user._id });
-  res.json(orders);
+
+  res.status(200).json({
+    success: true,
+    orders,
+  });
 });
 
-module.exports = { addOrderItem, getOrderById, updateOrderToPaid, getMyOrders };
+// get all Orders -- Admin
+exports.getAllOrders = catchAsyncErrors(async (req, res, next) => {
+  const orders = await Order.find();
+
+  let totalAmount = 0;
+
+  orders.forEach((order) => {
+    totalAmount += order.totalPrice;
+  });
+
+  res.status(200).json({
+    success: true,
+    totalAmount,
+    orders,
+  });
+});
+
+// update Order Status -- Admin
+exports.updateOrder = catchAsyncErrors(async (req, res, next) => {
+  const order = await Order.findById(req.params.id);
+
+  if (!order) {
+    return next(new ErrorHander("Order not found with this Id", 404));
+  }
+
+  if (order.orderStatus === "Delivered") {
+    return next(new ErrorHander("You have already delivered this order", 400));
+  }
+
+  if (req.body.status === "Shipped") {
+    order.orderItems.forEach(async (o) => {
+      await updateStock(o.product, o.quantity);
+    });
+  }
+  order.orderStatus = req.body.status;
+
+  if (req.body.status === "Delivered") {
+    order.deliveredAt = Date.now();
+  }
+
+  await order.save({ validateBeforeSave: false });
+  res.status(200).json({
+    success: true,
+  });
+});
+
+async function updateStock(id, quantity) {
+  const product = await Product.findById(id);
+
+  product.Stock -= quantity;
+
+  await product.save({ validateBeforeSave: false });
+}
+
+// delete Order -- Admin
+exports.deleteOrder = catchAsyncErrors(async (req, res, next) => {
+  const order = await Order.findById(req.params.id);
+
+  if (!order) {
+    return next(new ErrorHander("Order not found with this Id", 404));
+  }
+
+  await order.remove();
+
+  res.status(200).json({
+    success: true,
+  });
+});
