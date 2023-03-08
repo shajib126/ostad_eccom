@@ -12,7 +12,7 @@ COOKIE_EXPIRE
 CLOUDINARY_NAME
 CLOUDINARY_API_KEY 
 CLOUDINARY_API_SECRET 
-
+STRIPE_API_KEY 
+STRIPE_SECRET_KEY
 those variables;
-
-NB: to check admin dashboard you have to go your database (local/cloud) and then click on user and change the role user to admin
+ to check admin dashboard you have to go your database (local/cloud) and then click on user and change the role user to admin
