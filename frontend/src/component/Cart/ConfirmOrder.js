@@ -1,13 +1,15 @@
 import React, { Fragment } from "react";
 import CheckoutSteps from "../Cart/CheckoutSteps";
-import { useSelector } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 import MetaData from "../layout/MetaData";
 import "./ConfirmOrder.css";
 import { Link } from "react-router-dom";
 import { Typography } from "@material-ui/core";
+import { createOrder } from "../../actions/orderAction";
 
 const ConfirmOrder = ({ history }) => {
   const { shippingInfo, cartItems } = useSelector((state) => state.cart);
+  const dispatch = useDispatch()
   const { user } = useSelector((state) => state.user);
 
   const subtotal = cartItems.reduce(
@@ -35,6 +37,30 @@ const ConfirmOrder = ({ history }) => {
 
     history.push("/process/payment");
   };
+
+  const placeOrder = ()=>{
+    const orderInfo = {
+      subtotal,
+      shippingCharges,
+      tax,
+      totalPrice,
+    };
+    
+    const order = {
+      shippingInfo,
+      orderItems: cartItems,
+      paymentInfo:{
+        id:user._id,
+        status:'Cash On Delevery'
+      },
+      itemsPrice: orderInfo.subtotal,
+      taxPrice: orderInfo.tax,
+      shippingPrice: orderInfo.shippingCharges,
+      otalPrice: orderInfo.totalPrice,
+    }
+    dispatch(createOrder(order))
+    history.push('/success')
+  }
 
   return (
     <Fragment>
@@ -105,6 +131,7 @@ const ConfirmOrder = ({ history }) => {
             </div>
 
             <button onClick={proceedToPayment}>Proceed To Payment</button>
+            <button onClick={placeOrder}>COD</button>
           </div>
         </div>
       </div>
